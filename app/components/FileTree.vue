@@ -21,9 +21,17 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
           </svg>
         </button>
+        <button @click="triggerUpload" :disabled="uploadState.loading" title="Upload File" class="w-7 h-7 rounded-md bg-white/[0.04] hover:bg-mc-accent-green/15 text-gray-400 hover:text-mc-accent-green flex items-center justify-center transition-all border border-white/[0.05] disabled:opacity-50">
+          <svg v-if="!uploadState.loading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span v-else class="w-3.5 h-3.5 border-2 border-mc-accent-green/30 border-t-mc-accent-green rounded-full animate-spin"></span>
+        </button>
+        <input type="file" ref="fileInputRef" @change="handleFileUpload" class="hidden" />
         <span class="text-[10px] text-gray-500 uppercase tracking-wider font-medium bg-mc-dark-900/50 px-2 py-1 rounded-md">
           {{ items?.length || 0 }}
         </span>
+
       </div>
     </div>
 
@@ -272,6 +280,14 @@ const deleteModal = reactive({
   error: '',
 })
 
+// Upload State & Refs
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploadState = reactive({
+  loading: false,
+  error: '',
+})
+
+
 const breadcrumbs = computed(() => {
   if (!currentPath.value) return []
   const parts = currentPath.value.split('/')
@@ -402,6 +418,39 @@ async function handleDeleteSubmit() {
     deleteModal.loading = false
   }
 }
+
+// Upload Actions
+function triggerUpload() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  uploadState.loading = true
+  uploadState.error = ''
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('path', currentPath.value)
+
+  try {
+    await apiFetch('/api/files/upload', {
+      method: 'POST',
+      body: formData,
+    })
+    await loadDirectory(currentPath.value)
+  } catch (err: any) {
+    error.value = `Upload failed: ${err.data?.error || err.message}`
+  } finally {
+    uploadState.loading = false
+    // Reset file input agar bisa upload file yang sama lagi
+    target.value = ''
+  }
+}
+
 
 function formatSize(size: number | null) {
   if (size === null) return ''
